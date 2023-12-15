@@ -79,9 +79,6 @@ public class KakaoService {
             // session에 토큰 넣어두기
             session.setAttribute("access_token", access_token);
 
-            System.out.println(refresh_token);
-            System.out.println(access_token);
-
             return jsonObject.get("access_token").getAsString();
         } else {
             throw new HttpClientErrorException(responseEntity.getStatusCode(), "Failed to get access token");
@@ -114,9 +111,6 @@ public class KakaoService {
 
             String nickname = kakaoUserInforResponse.getProperties().getNickname();
             String email = kakaoUserInforResponse.getKakao_account().getEmail();
-
-            System.out.println(nickname);
-            System.out.println(email);
 
             //가져온 정보를 KakaoUserInforDto 객체에 담아 반환a
             return new KakaoUserInforDto(nickname, email);

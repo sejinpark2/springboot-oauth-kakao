@@ -1,16 +1,14 @@
 package com.example.login_test.kakao;
 
-import com.example.login_test.user.UserService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+
 
 @RequiredArgsConstructor
 @Controller
@@ -19,7 +17,6 @@ public class KakaoController {
 
     private final KakaoService kakaoService;
 
-    // model 삭제, req 추가
     @GetMapping("/oauth/kakao")
     public String login(@RequestParam(value = "code", required = false) String code, HttpServletRequest req) throws JsonProcessingException {
         if (code == null) {
@@ -36,7 +33,6 @@ public class KakaoController {
         }
     }
 
-    // code 제거, req 추가
     @PostMapping("/kakao/join")
     public ResponseEntity<String> join(HttpServletRequest req) {
         try {

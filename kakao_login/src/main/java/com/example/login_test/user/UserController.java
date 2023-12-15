@@ -36,29 +36,5 @@ public class UserController {
         return ResponseEntity.ok().header(JwtTokenProvider.HEADER, jwt)
                 .body(ApiUtils.success(null));
     }
-
-    @PostMapping("/kakaoJoin")
-    public ResponseEntity<?> kakaoJoin(@RequestBody UserRequest.KakaoJoinDTO kakaoUser, Error error) {
-
-        userService.kakaoJoin(kakaoUser);
-
-        userService.printKakaoUserInfo(kakaoUser.getEmail());
-
-        return ResponseEntity.ok(ApiUtils.success(null));
-    }
-
-    @PostMapping("/kakaoLogin")
-    public ResponseEntity<?> kakaoLogin(@RequestBody UserRequest.KakaoLoginDTO kakaoUser, Error error) {
-
-        String jwt = userService.kakaoLogin(kakaoUser);
-
-        //조인은 뜨고 로그인은 안뜸 이유 찾아서 해결하기
-        // html 바로 받아오는게 맞는 지 확인
-        //userService.printKakaoUserInfo(kakaoUser.getEmail());
-
-        return ResponseEntity.ok().header(JwtTokenProvider.HEADER, jwt)
-                .body(ApiUtils.success(null));
-    }
-
 }
 
