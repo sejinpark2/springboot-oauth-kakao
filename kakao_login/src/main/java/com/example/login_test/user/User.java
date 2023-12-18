@@ -39,19 +39,15 @@ public class User{
     @Convert(converter = StringArrayConverter.class)
     private List<String> roles = new ArrayList<>();
 
-    @Column(columnDefinition = "boolean default false")
-    private Boolean isKakaoUser;
-
     // * 주로 생성자의 인자가 많거나, 인자를 선택적으로 지정 해야 하는 경우에 사용.
     @Builder
-    public User(int id, String email, String password, String username, String phoneNumber, List<String> roles, Boolean isKakaoUser) {
+    public User(int id, String email, String password, String username, String phoneNumber, List<String> roles) {
         this.id = id;
         this.email = email;
         this.password = password;
         this.username = username;
         this.phoneNumber = phoneNumber;
         this.roles = roles;
-        this.isKakaoUser = isKakaoUser;
     }
 
     public void output(){

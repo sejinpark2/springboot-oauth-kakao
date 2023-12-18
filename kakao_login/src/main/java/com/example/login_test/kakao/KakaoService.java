@@ -4,8 +4,12 @@ import com.example.login_test.user.User;
 import com.example.login_test.user.UserRepository;
 import com.example.login_test.user.UserRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import lombok.RequiredArgsConstructor;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -15,13 +19,14 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.time.LocalDateTime;
 
-
+@RequiredArgsConstructor
 @Service
 public class KakaoService {
 
-    @Autowired
     private UserRepository userRepository;
 
     @Value("${kakao.api.key}")
@@ -33,106 +38,86 @@ public class KakaoService {
     @Value("${kakao.api.redirectUri}")
     private String REDIRECT_URI;
 
-    public String getKakaoLogin() {
-        return KAKAO_AUTH_URI + "/authorize"
-                + "?client_id=" + API_KEY
-                + "&redirect_uri=" + REDIRECT_URI
-                + "&response_type=code";
+
+    public void kakaoLogin(String code, HttpSession session) throws JsonProcessingException {
+        // 1. 인가코드로 엑세스토큰 가져오기
+        String accessToken = getAccessToken(code,session);
+        // 2. 엑세스토큰으로 유저정보 가져오기
+        KakaoLoginInfoDTO kakaoUserInfo = getKakaoUserInfo(accessToken);
     }
 
-    // 코드를 가져 와서 카카오 토큰을 가져오는 메서드
-    public String getKakaoToken(String code, HttpSession session) {
-        if (code == null) {
-            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Failed to get authorization code");
-        }
+    // #1 - 인가코드로 엑세스토큰 가져오기
+    public String getAccessToken(String code, HttpSession session) {
 
+        // 헤더에 Content-type 지정
         HttpHeaders headers = new HttpHeaders();
         headers.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
 
+        // 바디에 필요한 정보 담기
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
         params.add("client_id", API_KEY);
         params.add("redirect_uri", REDIRECT_URI);
         params.add("code", code);
 
+        // POST 요청 보내기
+        HttpEntity<MultiValueMap<String, String>> kakaoTokenReg = new HttpEntity<>(params, headers);
         RestTemplate restTemplate = new RestTemplate();
-        HttpEntity<MultiValueMap<String, String>> httpEntity = new HttpEntity<>(params, headers);
+        ResponseEntity<String> response = restTemplate.exchange(
+                "https://kauth.kakao.com/oauth/token",
+                HttpMethod.POST,
+                kakaoTokenReg,
+                String.class
+        );
 
-        ResponseEntity<String> responseEntity;
-        try {
-            responseEntity = restTemplate.exchange(KAKAO_AUTH_URI + "/token",
-                    HttpMethod.POST,
-                    httpEntity,
-                    String.class);
-        } catch (HttpClientErrorException e) {
-            throw new HttpClientErrorException(e.getStatusCode(), "Failed to get access token");
-        }
+        // response에서 엑세스토큰 가져오기
+        String tokenJson = response.getBody();
+        JSONObject jsonObject = new JSONObject(tokenJson);
+        String accessToken = jsonObject.getString("access_token");
 
-        if (responseEntity.getStatusCode() == HttpStatus.OK) {
-            Gson gson = new Gson();
-            JsonObject jsonObject = gson.fromJson(responseEntity.getBody(), JsonObject.class);
-            KakaoApiResponse kakaoApiResponse = gson.fromJson(responseEntity.getBody(), KakaoApiResponse.class);
-
-            String refresh_token = kakaoApiResponse.getRefresh_token();
-            String access_token = kakaoApiResponse.getAccess_token();
-
-            // session에 토큰 넣어두기
-            session.setAttribute("access_token", access_token);
-
-            return jsonObject.get("access_token").getAsString();
-        } else {
-            throw new HttpClientErrorException(responseEntity.getStatusCode(), "Failed to get access token");
-        }
+        session.setAttribute("access_token", accessToken);
+        return accessToken;
     }
 
-    //액세스 토큰으로 카카오 API를 통해 사용자 정보를 가져옴
-    public KakaoUserInforDto getKakaoInfo(String accessToken) throws JsonProcessingException {
-        RestTemplate restTemplate = new RestTemplate();
+    // #2. 엑세스토큰으로 유저정보 가져오기
+    private KakaoLoginInfoDTO getKakaoUserInfo(String accessToken) throws JsonProcessingException {
+        // HTTP Header 생성
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Authorization", "Bearer " + accessToken);
+        headers.add("Content-type", "application/x-www-form-urlencoded;charset=utf-8");
 
-        HttpHeaders httpHeaders = new HttpHeaders();
-        httpHeaders.add("Authorization", "Bearer " + accessToken);
+        // HTTP 요청 보내기
+        HttpEntity<MultiValueMap<String, String>> kakaoUserInfoRequest = new HttpEntity<>(headers);
+        RestTemplate rt = new RestTemplate();
+        ResponseEntity<String> response = rt.exchange(
+                "https://kapi.kakao.com/v2/user/me",
+                HttpMethod.POST,
+                kakaoUserInfoRequest,
+                String.class
+        );
 
-        HttpEntity<String> entity = new HttpEntity<>(httpHeaders);
+        String responseBody = response.getBody();
 
-        ResponseEntity<String> responseEntity;
-        try {
-            responseEntity = restTemplate.exchange("https://kapi.kakao.com/v2/user/me",
-                    HttpMethod.GET,
-                    entity,
-                    String.class);
-        } catch (HttpClientErrorException e) {
-            throw new HttpClientErrorException(e.getStatusCode(), "Failed to get user info");
-        }
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(responseBody);
+        Long id = jsonNode.get("id").asLong();
+//        System.out.println("jsonNode: " + jsonNode); // 무슨 값이 들어오나 체크
 
-        if (responseEntity.getStatusCode() == HttpStatus.OK) {
-
-            Gson gson = new Gson();
-            KakaoUserInforResponse kakaoUserInforResponse = gson.fromJson(responseEntity.getBody(), KakaoUserInforResponse.class);
-
-            String nickname = kakaoUserInforResponse.getProperties().getNickname();
-            String email = kakaoUserInforResponse.getKakao_account().getEmail();
-
-            //가져온 정보를 KakaoUserInforDto 객체에 담아 반환a
-            return new KakaoUserInforDto(nickname, email);
-
-        } else {
-            System.out.println("Failed to get access token. Response: " + responseEntity.getBody());
-            throw new HttpClientErrorException(responseEntity.getStatusCode(), "Failed to get user info");
-        }
+        // jsonNode 체크후 필요한 정보 가져오기 (추가 가능)
+        String nickname = jsonNode.get("properties")
+                .get("nickname").asText();
+        String userimage = jsonNode.get("properties")
+                .get("profile_image").asText();
+        String email = (jsonNode.get("kakao_account")
+                .get("email") != null) ? jsonNode.get("kakao_account")
+                .get("email").asText() : null;
+        System.out.println("id: " + id);
+        System.out.println("nickname: " + nickname);
+        System.out.println("userimage: " + userimage);
+        System.out.println("email: " + email);
+        return new KakaoLoginInfoDTO(id, nickname, email, userimage);
     }
 
-    public void join(HttpSession session) throws JsonProcessingException {
-        KakaoUserInforDto kakaoUserInfor = getKakaoInfo((String) session.getAttribute("access_token"));
-
-        String nickname = kakaoUserInfor.getNickname();
-        String email = kakaoUserInfor.getEmail();
-
-        UserRequest.KakaoJoinDTO kakaoJoinDTO = new UserRequest.KakaoJoinDTO();
-        kakaoJoinDTO.setUsername(nickname);
-        kakaoJoinDTO.setEmail(email);
-
-        userRepository.save(kakaoJoinDTO.toEntity());
-    }
 
     public void logout(HttpSession session) {
         String accessToken = (String) session.getAttribute("access_token");

@@ -1,12 +1,9 @@
 package com.example.login_test.user;
 
-import com.example.login_test.kakao.KakaoUserInforDto;
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
 import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 import java.util.Collections;
@@ -41,34 +38,6 @@ public class UserRequest {
                     .username(username)
                     .phoneNumber(phoneNumber)
                     .roles(Collections.singletonList("ROLE_USER"))
-                    .build();
-        }
-    }
-    @Getter
-    @Setter
-    public static class KakaoJoinDTO {
-        private String email;
-        private String username;
-
-        public User toEntity() {
-            return User.builder()
-                    .email(email)
-                    .username(username)
-                    .roles(Collections.singletonList("ROLE_USER"))
-                    .isKakaoUser(true)
-                    .build();
-        }
-    }
-
-    @Getter
-    @Setter
-    public static class KakaoLoginDTO {
-        private String email;
-
-        public User toEntity() {
-            return User.builder()
-                    .email(email)
-                    .isKakaoUser(true)
                     .build();
         }
     }
